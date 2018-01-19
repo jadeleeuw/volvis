@@ -64,14 +64,14 @@ public class GradientVolume {
         float y = (float) Math.floor(coord[1]);
         float z = (float) Math.floor(coord[2]);
         
-        VoxelGradient a = new VoxelGradient(x, y, z);
-        VoxelGradient b = new VoxelGradient(x, y, z+1);
-        VoxelGradient c = new VoxelGradient(x, y+1, z);
-        VoxelGradient d = new VoxelGradient(x, y+1, z+1);
-        VoxelGradient e = new VoxelGradient(x+1, y, z);
-        VoxelGradient f = new VoxelGradient(x+1, y, z+1);
-        VoxelGradient g = new VoxelGradient(x+1, y+1, z);
-        VoxelGradient h = new VoxelGradient(x+1, y+1, z+1);
+        VoxelGradient a = getGradient(x, y, z);
+        VoxelGradient b = getGradient(x, y, z+1);
+        VoxelGradient c = getGradient(x, y+1, z);
+        VoxelGradient d = getGradient(x, y+1, z+1);
+        VoxelGradient e = getGradient(x+1, y, z);
+        VoxelGradient f = getGradient(x+1, y, z+1);
+        VoxelGradient g = getGradient(x+1, y+1, z);
+        VoxelGradient h = getGradient(x+1, y+1, z+1);
 
         //biliniear interpolation on plane x)
         VoxelGradient ab = new VoxelGradient();
