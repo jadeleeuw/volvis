@@ -164,19 +164,38 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         
         double[] temp = exitPoint.clone();
         double value = 0;
-        TFColor colour;
+        TFColor colour = new TFColor();
         
         for(int i = 0; i < steps-1; i++){
             value = volume.getVoxelLinearInterpolate(temp);
+           
+            if (compositingMode) {
+                colour = tFunc.getColor((int) value);
+            }
+            if (tf2dMode) {
+                colour.a = tFunc2D.color.a;
+                colour.r = tFunc2D.color.r;
+                colour.g = tFunc2D.color.g;
+                colour.b = tFunc2D.color.b;
+                
+                int fv = tFunc2D.baseIntensity;
+                double rad = tFunc2D.radius;
+                float gm = gradients.getGradient(temp).mag;
+                
+                if (value == fv && gm == 0d) {
+                    colour.a *= 1d;
+                } else if(gm > 0d && value - (rad * gm) <= fv && fv <= value + (rad * gm)) {
+                    colour.a *= 1d - (1d/rad)*Math.abs((fv - value)/gm);
+                } else {
+                    colour.a *= 0d;
+                }
+                
+            }
             
-            colour = tFunc.getColor((int) value);
-            r = colour.r + (1 - colour.a) * r;
-            g = colour.g + (1 - colour.a) * g;
-            b = colour.b + (1 - colour.a) * b;
-            //a = colour.a + (1 - colour.a) * a;
-            a = (1 - a) * colour.a + a;
-            
-//            System.out.println("<"+r+","+g+","+b+","+a+">");
+            r = colour.a * colour.r + (1 - colour.a) * r;
+            g = colour.a * colour.g + (1 - colour.a) * g;
+            b = colour.a * colour.b + (1 - colour.a) * b;
+            a = colour.a + (1 - colour.a) * a;
             
             temp[0] -= step0;
             temp[1] -= step1;

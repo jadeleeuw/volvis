@@ -40,11 +40,11 @@ public class Volume {
 
         // Cellecting vowel values for the eight voxels serounding our coordinat.
         int floor0 = (int) Math.floor(coord[0]);
-        int ceil0 = (int) Math.ceil(coord[0]);
+        int ceil0 = floor0 + 1;
         int floor1 = (int) Math.floor(coord[1]);
-        int ceil1 = (int) Math.ceil(coord[1]);
+        int ceil1 = floor1 + 1;
         int floor2 = (int) Math.floor(coord[2]);
-        int ceil2 = (int) Math.ceil(coord[2]);
+        int ceil2 = floor2 + 1;
         
         
         float a = getVoxel(floor0, floor1, floor2);

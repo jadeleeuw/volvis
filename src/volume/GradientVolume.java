@@ -23,18 +23,32 @@ public class GradientVolume {
 
     // You need to implement this function
     private void compute() {
+        for (int x = 0; x < dimX; x++) {
+            for (int y = 0; y < dimY; y++) {
+                for (int z = 0; z < dimZ; z++) {
+                    if (x == 0 || x == dimX-1 || y == 0 || y == dimY-1 || z == 0 || z == dimZ-1) {
+                        setGradient(x, y, z, zero);
+                    } else {
+                        float gx = (volume.getVoxel(x+1, y, z) - volume.getVoxel(x-1, y, z)) / 2;
+                        float gy = (volume.getVoxel(x, y+1, z) - volume.getVoxel(x, y-1, z)) / 2;
+                        float gz = (volume.getVoxel(x, y, z+1) - volume.getVoxel(x, y, z-1)) / 2;
 
-        for (int i=0; i<data.length; i++) {
-            data[i] = zero;
+                        setGradient(x, y, z, new VoxelGradient(gx, gy, gz));
+                    }
+                }
+            }
         }
-        // to be implemented
     }
     	
     //You need to implement this function
-    //This function linearly interpolates gradient vector g0 and g1 given the factor (t) 
+    //This function linearly interpolates gradient vector gas0 and g1 given the factor (t) 
     //the resut is given at result. You can use it to tri-linearly interpolate the gradient
     private void interpolate(VoxelGradient g0, VoxelGradient g1, float factor, VoxelGradient result) {
        // to be implemented
+       result.x = factor*g1.x + (1f - factor)* g0.x;
+       result.y = factor*g1.y + (1f - factor)* g0.y;
+       result.z = factor*g1.z + (1f - factor)* g0.z ;
+       result.mag = new VoxelGradient(result.x, result.y, result.z).mag;
     }
     
     // You need to implement this function
@@ -45,13 +59,39 @@ public class GradientVolume {
                 || coord[2] < 0 || coord[2] > (dimZ-2)) {
             return zero;
         }
-
-        int x = (int) Math.floor(coord[0]);
-        int y = (int) Math.floor(coord[1]);
-        int z = (int) Math.floor(coord[2]);
         
-        return getGradient(x, y, z);
-        // To be impmented right now it impments just a nearest neighbour
+        float x = (float) Math.floor(coord[0]);
+        float y = (float) Math.floor(coord[1]);
+        float z = (float) Math.floor(coord[2]);
+        
+        VoxelGradient a = new VoxelGradient(x, y, z);
+        VoxelGradient b = new VoxelGradient(x, y, z+1);
+        VoxelGradient c = new VoxelGradient(x, y+1, z);
+        VoxelGradient d = new VoxelGradient(x, y+1, z+1);
+        VoxelGradient e = new VoxelGradient(x+1, y, z);
+        VoxelGradient f = new VoxelGradient(x+1, y, z+1);
+        VoxelGradient g = new VoxelGradient(x+1, y+1, z);
+        VoxelGradient h = new VoxelGradient(x+1, y+1, z+1);
+
+        //biliniear interpolation on plane x)
+        VoxelGradient ab = new VoxelGradient();
+        interpolate(a, b, (float) (coord[2]-z), ab);
+        VoxelGradient cd = new VoxelGradient();
+        interpolate(c, d, (float) (coord[2]-z), cd);
+        VoxelGradient abcd = new VoxelGradient();
+        interpolate(ab, cd, (float) (coord[1]-y), abcd);
+        
+        //biliniear interpolation on plane x+1)
+        VoxelGradient ef = new VoxelGradient();
+        interpolate(e, f, (float) (coord[2]-z), ef);
+        VoxelGradient gh = new VoxelGradient();
+        interpolate(g, h, (float) (coord[2]-z), gh);
+        VoxelGradient efgh = new VoxelGradient();
+        interpolate(ef, gh, (float) (coord[1]-y), efgh);
+        
+        VoxelGradient result = new VoxelGradient();
+        interpolate(abcd, efgh, (float) (coord[0]-x), result);
+        return result;
     }
     
     
