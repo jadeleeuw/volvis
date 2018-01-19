@@ -60,9 +60,9 @@ public class GradientVolume {
             return zero;
         }
         
-        float x = (float) Math.floor(coord[0]);
-        float y = (float) Math.floor(coord[1]);
-        float z = (float) Math.floor(coord[2]);
+        int x = (int) Math.floor(coord[0]);
+        int y = (int) Math.floor(coord[1]);
+        int z = (int) Math.floor(coord[2]);
         
         VoxelGradient a = getGradient(x, y, z);
         VoxelGradient b = getGradient(x, y, z+1);
