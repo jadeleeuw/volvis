@@ -45,9 +45,10 @@ public class GradientVolume {
     //the resut is given at result. You can use it to tri-linearly interpolate the gradient
     private void interpolate(VoxelGradient g0, VoxelGradient g1, float factor, VoxelGradient result) {
        // to be implemented
-       result.x = factor*g1.x + (1f - factor)* g0.x;
-       result.y = factor*g1.y + (1f - factor)* g0.y;
-       result.z = factor*g1.z + (1f - factor)* g0.z ;
+        float invFac = (1f - factor);
+       result.x = factor * g1.x + invFac * g0.x;
+       result.y = factor * g1.y + invFac * g0.y;
+       result.z = factor * g1.z + invFac * g0.z;
        result.mag = new VoxelGradient(result.x, result.y, result.z).mag;
     }
     
@@ -111,7 +112,9 @@ public class GradientVolume {
         } else {
             double magnitude = data[0].mag;
             for (int i=0; i<data.length; i++) {
-                magnitude = data[i].mag > magnitude ? data[i].mag : magnitude;
+                if (data[i].mag > magnitude) {
+                    magnitude = data[i].mag;
+                }
             }   
             maxmag = magnitude;
             return magnitude;

@@ -11,12 +11,12 @@ import com.jogamp.opengl.util.texture.awt.AWTTextureIO;
 import gui.RaycastRendererPanel;
 import gui.TransferFunction2DEditor;
 import gui.TransferFunctionEditor;
-import java.awt.image.BufferedImage;
 import util.TFChangeListener;
 import util.VectorMath;
 import volume.GradientVolume;
 import volume.Volume;
-import volume.VoxelGradient;
+
+import java.awt.image.BufferedImage;
 
 
 /**
@@ -149,11 +149,11 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         // You need to implement the rest of the function for compositing.    
 
         // Example color you have to substitute it by the result of the MIP 
-        double step0 = exitPoint[0]-entryPoint[0];
-        double step1 = exitPoint[1]-entryPoint[1];
-        double step2 = exitPoint[2]-entryPoint[2];
+        double step0 = exitPoint[0] - entryPoint[0];
+        double step1 = exitPoint[1] - entryPoint[1];
+        double step2 = exitPoint[2] - entryPoint[2];
         
-        double d = Math.sqrt(step0*step0 + step1*step1 + step2*step2);
+        double d = Math.sqrt(step0 * step0 + step1 * step1 + step2 * step2);
         double steps = d / sampleStep;
         
         step0 = step0 / steps;
@@ -163,7 +163,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         double r= 0, g = 0, b = 0, a = 0;
         
         double[] temp = exitPoint.clone();
-        double value = 0;
+        double value;
         TFColor colour = new TFColor();
         
         for(int i = 0; i < steps-1; i++){
@@ -185,7 +185,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                 if (value == fv && gm == 0d) {
                     colour.a *= 1d;
                 } else if(gm > 0d && value - (rad * gm) <= fv && fv <= value + (rad * gm)) {
-                    colour.a *= 1d - (1d/rad)*Math.abs((fv - value)/gm);
+                    colour.a *= 1d - (1d/rad) * Math.abs((fv - value)/gm);
                 } else {
                     colour.a *= 0d;
                 }

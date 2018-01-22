@@ -21,7 +21,7 @@ public class Volume {
     //This function linearly interpolates the value g0 and g1 given the factor (t) 
     //the result is returned. You can use it to tri-linearly interpolate the values 
 	private float interpolate(float g0, float g1, float factor) {
-            return factor*g1 + g0*(1f - factor);
+            return factor * g1 + (1f - factor) * g0;
 //            float result=0;
 //            // to be implemented
 //            return result; 
