@@ -15,6 +15,7 @@ import util.TFChangeListener;
 import util.VectorMath;
 import volume.GradientVolume;
 import volume.Volume;
+import volume.VoxelGradient;
 
 import java.awt.image.BufferedImage;
 
@@ -105,17 +106,16 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
     	//Hint: compute the increment and the number of samples you need and iterate over them.
                 
         //You need to iterate through the ray. Starting at the entry point.
-        
-        double step0 = exitPoint[0]-entryPoint[0];
-        double step1 = exitPoint[1]-entryPoint[1];
-        double step2 = exitPoint[2]-entryPoint[2];
-        
-        double d = Math.sqrt(step0*step0 + step1*step1 + step2*step2);
+
+        double[] step = new double[3];
+        VectorMath.setVector(step, exitPoint[0]-entryPoint[0], exitPoint[1]-entryPoint[1], exitPoint[2]-entryPoint[2]);
+
+        double d = VectorMath.length(step);
         double steps = d / sampleStep;
-        
-        step0 = step0 / steps;
-        step1 = step1 / steps;
-        step2 = step2 / steps;
+
+        for (int i=0; i<3; i++) {
+            step[i] /= steps;
+        }
         
         double maxIntensity = Double.MIN_VALUE;
         double[] temp = entryPoint.clone();
@@ -125,10 +125,8 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
             if(value > maxIntensity) {
                 maxIntensity = value;
             }
-            
-            temp[0] += step0;
-            temp[1] += step1;
-            temp[2] += step2;
+
+            VectorMath.setVector(temp, temp[0]+step[0], temp[1]+step[1], temp[2]+step[2]);
         }
  
         // Example color, you have to substitute it by the result of the MIP 
@@ -146,21 +144,21 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         //half vector is used to speed up the phong shading computation see slides
         getLightVector(lightVector,halfVector,rayVector);
         
-        // You need to implement the rest of the function for compositing.    
+        // You need to implement the rest of the function for compositing.
 
-        // Example color you have to substitute it by the result of the MIP 
-        double step0 = exitPoint[0] - entryPoint[0];
-        double step1 = exitPoint[1] - entryPoint[1];
-        double step2 = exitPoint[2] - entryPoint[2];
+        double[] step = new double[3];
+        VectorMath.setVector(step, exitPoint[0]-entryPoint[0], exitPoint[1]-entryPoint[1], exitPoint[2]-entryPoint[2]);
         
-        double d = Math.sqrt(step0 * step0 + step1 * step1 + step2 * step2);
+        double d = VectorMath.length(step);
         double steps = d / sampleStep;
+
+        for (int i=0; i<3; i++) {
+            step[i] /= steps;
+        }
         
-        step0 = step0 / steps;
-        step1 = step1 / steps;
-        step2 = step2 / steps;
-        
-        double r= 0, g = 0, b = 0, a = 0;
+        double r = 0, g = 0, b = 0, a = 0;
+        double ka = 0.1, kd = 0.7, ks = 0.2;
+        int n = 10;
         
         double[] temp = exitPoint.clone();
         double value;
@@ -168,10 +166,13 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         
         for(int i = 0; i < steps-1; i++){
             value = volume.getVoxelLinearInterpolate(temp);
+            VoxelGradient gradient =  gradients.getGradient(temp);
+            float gm = gradient.mag;
            
             if (compositingMode) {
                 colour = tFunc.getColor((int) value);
             }
+
             if (tf2dMode) {
                 colour.a = tFunc2D.color.a;
                 colour.r = tFunc2D.color.r;
@@ -180,7 +181,6 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                 
                 int fv = tFunc2D.baseIntensity;
                 double rad = tFunc2D.radius;
-                float gm = gradients.getGradient(temp).mag;
                 
                 if (value == fv && gm == 0d) {
                     colour.a *= 1d;
@@ -189,17 +189,34 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                 } else {
                     colour.a *= 0d;
                 }
-                
+            }
+
+            if (shadingMode) {
+                double[] gradientVec = new double[3];
+                VectorMath.setVector(gradientVec, gradient.x/gm, gradient.y/gm, gradient.z/gm);
+
+                double diffFactor = VectorMath.dotproduct(gradientVec,lightVector) * kd;
+                double specFactor = Math.pow(VectorMath.dotproduct(gradientVec,halfVector), n) * ks;
+
+                if (diffFactor  > 0) {
+                    colour.r = colour.r * diffFactor + ka;
+                    colour.g = colour.g * diffFactor + ka;
+                    colour.b = colour.b * diffFactor + ka;
+                }
+
+                if (specFactor > 0) {
+                    colour.r += specFactor;
+                    colour.g += specFactor;
+                    colour.b += specFactor;
+                }
             }
             
             r = colour.a * colour.r + (1 - colour.a) * r;
             g = colour.a * colour.g + (1 - colour.a) * g;
             b = colour.a * colour.b + (1 - colour.a) * b;
             a = colour.a + (1 - colour.a) * a;
-            
-            temp[0] -= step0;
-            temp[1] -= step1;
-            temp[2] -= step2;
+
+            VectorMath.setVector(temp, temp[0]-step[0], temp[1]-step[1], temp[2]-step[2]);
         }
         
         return computeImageColor(r,g,b,a);
