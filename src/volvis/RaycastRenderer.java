@@ -182,7 +182,6 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                 
                 int fv = tFunc2D.baseIntensity;
                 double rad = tFunc2D.radius;
-                
                 if (value == fv && gm == 0d) {
                     colour.a *= 1d;
                 } else if(gm > 0d && value - (rad * gm) <= fv && fv <= value + (rad * gm)) {
@@ -200,11 +199,10 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                 double specFactor = Math.pow(VectorMath.dotproduct(gradientVec,halfVector), n) * ks;
 
                 if (diffFactor  > 0) {
-                    colour.r = colour.r * diffFactor + ka;
-                    colour.g = colour.g * diffFactor + ka;
-                    colour.b = colour.b * diffFactor + ka;
+                    colour.r = colour.r * diffFactor + ka * colour.r;
+                    colour.g = colour.g * diffFactor + ka * colour.g;
+                    colour.b = colour.b * diffFactor + ka * colour.b;
                 }
-
                 if (specFactor > 0) {
                     colour.r += specFactor;
                     colour.g += specFactor;
