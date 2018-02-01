@@ -104,7 +104,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
     // To be implemented
     int traceRayMIP(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep) {
     	//Hint: compute the increment and the number of samples you need and iterate over them.
-                
+
         //You need to iterate through the ray. Starting at the entry point.
 
         double[] step = new double[3];
@@ -116,27 +116,28 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         for (int i=0; i<3; i++) {
             step[i] /= steps;
         }
-        
+
         double maxIntensity = Double.MIN_VALUE;
         double[] temp = entryPoint.clone();
-        
+
         for(int i = 0; i < steps; i++){
             short value = volume.getVoxelLinearInterpolate(temp);
             if(value > maxIntensity) {
                 maxIntensity = value;
             }
+            else if(maxIntensity==volume.getMaximum()) {
+                break; //this check makes sure that when the maximum possible intensity is reached, the search stops
+            }
 
             VectorMath.setVector(temp, temp[0]+step[0], temp[1]+step[1], temp[2]+step[2]);
         }
- 
-        // Example color, you have to substitute it by the result of the MIP 
+
+        // Example color, you have to substitute it by the result of the MIP
         double c = maxIntensity / volume.getMaximum();
         double alpha = c > 0 ? 1.0 : 0.0;
         return computeImageColor(c,c,c,alpha);
     }
-    
-    
-    
+
     int traceRayComposite(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep) {
         double[] lightVector = new double[3];
         double[] halfVector = new double[3];
@@ -210,13 +211,16 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                     colour.b += specFactor;
                 }
             }
-            
             r = colour.a * colour.r + (1 - colour.a) * r;
             g = colour.a * colour.g + (1 - colour.a) * g;
             b = colour.a * colour.b + (1 - colour.a) * b;
             a = colour.a + (1 - colour.a) * a;
 
+            if(a>0.99){
+                break; // If the value reaches 1, the next opacity will be of less value.
+            }
             VectorMath.setVector(temp, temp[0]-step[0], temp[1]-step[1], temp[2]-step[2]);
+
         }
         
         return computeImageColor(r,g,b,a);
