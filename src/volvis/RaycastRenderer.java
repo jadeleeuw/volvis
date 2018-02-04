@@ -161,7 +161,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         double ka = 0.1, kd = 0.7, ks = 0.2;
         int n = 10;
         
-        double[] temp = exitPoint.clone();
+        double[] temp = entryPoint.clone();
         double value;
         TFColor colour = new TFColor();
         
@@ -209,15 +209,16 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                     colour.b += specFactor;
                 }
             }
-            r = colour.a * colour.r + (1 - colour.a) * r;
-            g = colour.a * colour.g + (1 - colour.a) * g;
-            b = colour.a * colour.b + (1 - colour.a) * b;
-            a = colour.a + (1 - colour.a) * a;
+            r += colour.a * colour.r * (1 - a);
+            g += colour.a * colour.g * (1 - a);
+            b += colour.a * colour.b * (1 - a);
+            a += (1 - a) * colour.a;
 
             if(a>0.99){
                 break; // If the value reaches 1, the next opacity will be of less value.
             }
-            VectorMath.setVector(temp, temp[0]-step[0], temp[1]-step[1], temp[2]-step[2]);
+
+            VectorMath.setVector(temp, temp[0]+step[0], temp[1]+step[1], temp[2]+step[2]);
 
         }
         
