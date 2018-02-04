@@ -11,6 +11,7 @@ import com.jogamp.opengl.util.texture.awt.AWTTextureIO;
 import gui.RaycastRendererPanel;
 import gui.TransferFunction2DEditor;
 import gui.TransferFunctionEditor;
+import jdk.nashorn.internal.ir.IfNode;
 import util.TFChangeListener;
 import util.VectorMath;
 import volume.GradientVolume;
@@ -18,6 +19,7 @@ import volume.Volume;
 import volume.VoxelGradient;
 
 import java.awt.image.BufferedImage;
+import java.util.WeakHashMap;
 
 
 /**
@@ -96,20 +98,25 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
 	        }
 	    }
 	}
-    
 
-  
-    //Implementation of the MIP per ray  given the entry and exit point and the ray direction
-    // sampleStep indicates the distance between samples
-    // To be implemented
+
+    /**
+     * Returns the color corresponding to the maximum intensity value of the ray. It increments over the ray in steps of
+     * sampleStep, for each
+     * intersection point it retrieves the intensity. Finnally it takes the maximum of all the intensities.
+     * @param entryPoint Point of entering the model.
+     * @param exitPoint Point of exiting the model.
+     * @param rayVector The vector of the ray.
+     * @param sampleStep The size of the sampel steps.
+     * @return Returns the color corresponding to the maximum intensity of the intersection points between the ray and
+     * the model.
+     */
     int traceRayMIP(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep) {
-    	//Hint: compute the increment and the number of samples you need and iterate over them.
-
-        //You need to iterate through the ray. Starting at the entry point.
-
+//        Calculate the steps that need to be added to the previous intersection point to traverse the ray.
         double[] step = new double[3];
         VectorMath.setVector(step, exitPoint[0]-entryPoint[0], exitPoint[1]-entryPoint[1], exitPoint[2]-entryPoint[2]);
 
+//        Calculate the number of steps the must be made.
         double d = VectorMath.length(step);
         double steps = d / sampleStep;
 
@@ -117,111 +124,186 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
             step[i] /= steps;
         }
 
+//        Initialise maxIntensity and set the starting point to the entryPoint.
         double maxIntensity = Double.MIN_VALUE;
         double[] temp = entryPoint.clone();
 
+//        Iterate over all the intersection points
         for(int i = 0; i < steps; i++){
+//            Retrieve the intensity value
             short value = volume.getVoxelLinearInterpolate(temp);
+//            Calculate if it is the maximum
             if(value > maxIntensity) {
                 maxIntensity = value;
             }
+//            If the maximum so far is equal to the maximum of the model then we do not have to search any further.
+// The maximum has been found.
             else if(maxIntensity==volume.getMaximum()) {
                 break; //this check makes sure that when the maximum possible intensity is reached, the search stops
             }
 
+//            Calculate the coordinates of the next intersection point
             VectorMath.setVector(temp, temp[0]+step[0], temp[1]+step[1], temp[2]+step[2]);
         }
 
-        // Example color, you have to substitute it by the result of the MIP
+//        Compute the color to display the intensity that was found in this ray.
         double c = maxIntensity / volume.getMaximum();
         double alpha = c > 0 ? 1.0 : 0.0;
         return computeImageColor(c,c,c,alpha);
     }
 
+    /**
+     * Calculates the colour by applying compositing or the 2d transfor function depending on with mode is true. It
+     * then applies blinn-phong shading if shading = true
+     * @param entryPoint The point where the ray enters the model (first intersection point)
+     * @param exitPoint The point where the ray exits the model
+     * @param rayVector The vector represnting the direction of the ray.
+     * @param sampleStep The sample step to calculate the next intersection points.
+     * @return The colour computed by applying compositing or the 2d transfor function and perhaps blinn-phong
+     * shading on each of the intersection points.
+     */
     int traceRayComposite(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep) {
         double[] lightVector = new double[3];
         double[] halfVector = new double[3];
         //the light vector is directed toward the view point (which is the source of the light)
         //half vector is used to speed up the phong shading computation see slides
         getLightVector(lightVector,halfVector,rayVector);
-        
-        // You need to implement the rest of the function for compositing.
 
+//        Calculate the steps that need to be added to the previous intersection point to traverse the ray.
         double[] step = new double[3];
         VectorMath.setVector(step, exitPoint[0]-entryPoint[0], exitPoint[1]-entryPoint[1], exitPoint[2]-entryPoint[2]);
-        
+
+//        Calculate the number of steps the must be made.
         double d = VectorMath.length(step);
         double steps = d / sampleStep;
 
         for (int i=0; i<3; i++) {
             step[i] /= steps;
         }
-        
+
+//        Initialise variables for iteration.
         double r = 0, g = 0, b = 0, a = 0;
         double ka = 0.1, kd = 0.7, ks = 0.2;
         int n = 10;
-        
+
+//        Set the starting point to the entry point
         double[] temp = entryPoint.clone();
         double value;
         TFColor colour = new TFColor();
-        
+
+//        Iterate over all the intersection points
         for(int i = 0; i < steps-1; i++){
+//            Retrieve the intensity value
             value = volume.getVoxelLinearInterpolate(temp);
+//            Retrieve the gradient for the given voxel (direction of greatest change)
             VoxelGradient gradient =  gradients.getGradient(temp);
+//            Magnitude of gradient
             float gm = gradient.mag;
-           
+
+//            The function is called for both the compositing mode and the transfer function 2d mode.
+//            The following code corresponds to compositing.
             if (compositingMode) {
+//                We set the colour of this intersection point to the colour corresponding to the intensity value.
                 colour = tFunc.getColor((int) value);
             }
 
+//            The following code corresponds to the transfer function 2d mode.
             if (tf2dMode) {
+//                We set the opacity to the opacity specified by the tf2d function.
                 colour.a = tFunc2D.color.a;
+//                We set the colour to the colour specified by the tf2d function.
                 colour.r = tFunc2D.color.r;
                 colour.g = tFunc2D.color.g;
                 colour.b = tFunc2D.color.b;
-                
+
+//                We retrieve the baseIntensity and radius of the tf2d function.
                 int fv = tFunc2D.baseIntensity;
                 double rad = tFunc2D.radius;
+
+//                If the magnitude is 0 and the intensity is equal to the base intensity (bottom point of the
+// function) then the opacity is 1.
                 if (value == fv && gm == 0d) {
                     colour.a *= 1d;
-                } else if(gm > 0d && value - (rad * gm) <= fv && fv <= value + (rad * gm)) {
+                }
+//                If the magnitude is between the lines set in the tfd2 function the we will use this formula.
+                else if(gm > 0d && value - (rad * gm) <= fv && fv <= value + (rad * gm)) {
+//                    This formula is given but it creates a slope for intensity = base intensity from 1 at mag = 0
+// to 0 for mag = 180. It further creates a slope from the base intensity to the lines.
                     colour.a *= 1d - (1d/rad) * Math.abs((fv - value)/gm);
-                } else {
+                }
+//                Outside of the radius lines the transparancy = 0.
+                else {
                     colour.a *= 0d;
                 }
             }
 
+//            This code corresponds to shading. We try to calculate the color using blinn-phong shading for the given
+// voxel.
             if (shadingMode) {
+//                We create a vector simbolising the direction of greatest change using the gradient values.
                 double[] gradientVec = new double[3];
                 VectorMath.setVector(gradientVec, gradient.x/gm, gradient.y/gm, gradient.z/gm);
 
+//                We calculate the factor for diffused lighting. The dotproduct gives us a value that is higher when
+// the lightVec is closer to the gradientVec. We then mulitply this by the given kd factor.
                 double diffFactor = VectorMath.dotproduct(gradientVec,lightVector) * kd;
+//                We calculate the spectral factor.
+//                The halfVector is the vector of how the light would leave if it bounced of a surface with a
+// normal=gradientVec.
+//                The dot product corresponds to the similarity between the gradientVec and the halfVec.
+//                To make the effect stronger we then take this value to the nth pow.
+//                Finally we multiply this with the given spectral coeficient.
                 double specFactor = Math.pow(VectorMath.dotproduct(gradientVec,halfVector), n) * ks;
 
+//                Add the ambient lighting (we scale the colour with th ambient factor.)
+                colour.r *= ka;
+                colour.g *= ka;
+                colour.b *= ka;
+
+//                If statement to check if we need to apply diffused lighting.
                 if (diffFactor  > 0) {
-                    colour.r = colour.r * diffFactor + ka * colour.r;
-                    colour.g = colour.g * diffFactor + ka * colour.g;
-                    colour.b = colour.b * diffFactor + ka * colour.b;
+//                    Add the diffused lighting
+                    colour.r += colour.r * diffFactor;
+                    colour.g += colour.g * diffFactor;
+                    colour.b += colour.b * diffFactor;
                 }
+//                If statement to check if we need to apply spectral lighting.
                 if (specFactor > 0) {
+//                    Add the spectral lighting (we assume that the specteral lighting is white and therefore we do
+// not multiply the factor with a colour.)
                     colour.r += specFactor;
                     colour.g += specFactor;
                     colour.b += specFactor;
                 }
+
+//                We check if none of the colour channels increased above 1. (This could happen becasue we add the
+// three different lightings (ambient, diffused, and spectral))
+                (colour.r>1?1:colour.r;
+                (colour.g>1?1:colour.r;
+                (colour.b>1?1:colour.r;
             }
+
+//            We calculate the rgba value that we would see 'sofar'.
+//            We calculate howmush of the 'light' has already been absorbed by earlier parts of the model: (1-a).
+//            We then multiply this with the current color multiplied with the opacity corresponding to this
+// intersection point.
             r += colour.a * colour.r * (1 - a);
             g += colour.a * colour.g * (1 - a);
             b += colour.a * colour.b * (1 - a);
+
+//            We calculate the amount of light that will have been obsorbed after this intersection point.
             a += (1 - a) * colour.a;
 
+//            If almost all the 'light' has been absorbed we can quite because (1-a) will be almost 0.
             if(a>0.99){
-                break; // If the value reaches 1, the next opacity will be of less value.
+                break;
             }
 
+//            We calculate the coordinates of the next intersection point.
             VectorMath.setVector(temp, temp[0]+step[0], temp[1]+step[1], temp[2]+step[2]);
-
         }
-        
+
+//        We return the calculated colour.
         return computeImageColor(r,g,b,a);
     }
     
