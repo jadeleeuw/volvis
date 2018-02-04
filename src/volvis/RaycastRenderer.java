@@ -151,13 +151,13 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
     }
 
     /**
-     * Calculates the colour by applying compositing or the 2d transfor function depending on with mode is true. It
+     * Calculates the colour by applying compositing or the 2d transfer function depending on with mode is true. It
      * then applies blinn-phong shading if shading = true
      * @param entryPoint The point where the ray enters the model (first intersection point)
      * @param exitPoint The point where the ray exits the model
-     * @param rayVector The vector represnting the direction of the ray.
+     * @param rayVector The vector representing the direction of the ray.
      * @param sampleStep The sample step to calculate the next intersection points.
-     * @return The colour computed by applying compositing or the 2d transfor function and perhaps blinn-phong
+     * @return The colour computed by applying compositing or the 2d transfer function and perhaps blinn-phong
      * shading on each of the intersection points.
      */
     int traceRayComposite(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep) {

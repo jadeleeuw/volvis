@@ -18,35 +18,38 @@ public class Volume {
 	///////////////// TO BE IMPLEMENTED //////////////////////////////////
 		//////////////////////////////////////////////////////////////////////
 
-    //This function linearly interpolates the value g0 and g1 given the factor (t) 
-    //the result is returned. You can use it to tri-linearly interpolate the values 
-	private float interpolate(float g0, float g1, float factor) {
+    /**
+     * This function linearly interpolates the value g0 and g1 given the factor
+     * @param g0 First value
+     * @param g1 Second Value
+     * @param factor Factor to interpolate with
+     * @return Result of the interpolation
+     */
+    private float interpolate(float g0, float g1, float factor) {
             return factor * g1 + (1f - factor) * g0;
-//            float result=0;
-//            // to be implemented
-//            return result; 
     }
-	
-	//You have to implement the trilinear interpolation of the volume
-	//First implement the interpolated function above
-        // At the moment the function does takes just the lowest voxel value
-        // to trilinear interpolation
+
+    /**
+     * Uses trilinear interpolation to calculate the value of the given coordinate using the 8 surounding voxels.
+     * @param coord The given oordinate
+     * @return The interpolated value.
+     */
 	public short getVoxelLinearInterpolate(double[] coord) {
+//        If the coordinate is outside of the model return 0
         if (coord[0] < 0 || coord[0] > (dimX-2) || coord[1] < 0 || coord[1] > (dimY-2)
                 || coord[2] < 0 || coord[2] > (dimZ-2)) {
             return 0;
         }
-        /* notice that in this framework we assume that the distance between neighbouring voxels is 1 in all directions*/
 
-        // Cellecting vowel values for the eight voxels serounding our coordinat.
+        // Calculattion of the coordinate values of voxels surounding the point
         int floor0 = (int) Math.floor(coord[0]);
         int ceil0 = floor0 + 1;
         int floor1 = (int) Math.floor(coord[1]);
         int ceil1 = floor1 + 1;
         int floor2 = (int) Math.floor(coord[2]);
         int ceil2 = floor2 + 1;
-        
-        
+
+        // Collecting voxel values for the eight voxels surrounding our coordinate.
         float a = getVoxel(floor0, floor1, floor2);
         float b = getVoxel(floor0, floor1, ceil2);
         float c = getVoxel(floor0, ceil1, floor2);
@@ -56,16 +59,17 @@ public class Volume {
         float g = getVoxel(ceil0, ceil1, floor2);
         float h = getVoxel(ceil0, ceil1, ceil2);
 
-        //biliniear interpolation on plane Math.floor(coord[0])
+        // Biliniear interpolation on plane floor0
         float ab = interpolate(a, b, (float) (coord[2]-floor2));
         float cd = interpolate(c, d, (float) (coord[2]-floor2));
         float abcd = interpolate(ab, cd, (float) (coord[1]-floor1));
         
-        //biliniear interpolation on plane Math.ceil(coord[0])
+        // Biliniear interpolation on plane ceil0
         float ef = interpolate(e, f, (float) (coord[2]-floor2));
         float gh = interpolate(g, h, (float) (coord[2]-floor2));
         float efgh = interpolate(ef, gh, (float) (coord[1]-floor1));
-            
+
+        // Interpolation between the two bilinear interpolation results.
         return (short) Math.round(interpolate(abcd, efgh, (float) (coord[0]-floor0))); 
     }
 		
@@ -159,6 +163,8 @@ public class Volume {
     }
     
 	//Do NOT modify this function
+    //Sorry we did modify, we created a global variable that stores the value. This value is calculated using
+    // calculateMaximum which is called on initialization.
     public short getMaximum() {
         return this.maximum;
     }
