@@ -11,7 +11,6 @@ import com.jogamp.opengl.util.texture.awt.AWTTextureIO;
 import gui.RaycastRendererPanel;
 import gui.TransferFunction2DEditor;
 import gui.TransferFunctionEditor;
-import jdk.nashorn.internal.ir.IfNode;
 import util.TFChangeListener;
 import util.VectorMath;
 import volume.GradientVolume;
@@ -19,7 +18,6 @@ import volume.Volume;
 import volume.VoxelGradient;
 
 import java.awt.image.BufferedImage;
-import java.util.WeakHashMap;
 
 
 /**
@@ -240,58 +238,62 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
 //            This code corresponds to shading. We try to calculate the color using blinn-phong shading for the given
 // voxel.
             if (shadingMode) {
+//                make result colour
+                TFColor shadingColour = new TFColor();
 //                We create a vector simbolising the direction of greatest change using the gradient values.
                 double[] gradientVec = new double[3];
                 VectorMath.setVector(gradientVec, gradient.x/gm, gradient.y/gm, gradient.z/gm);
 
 //                We calculate the factor for diffused lighting. The dotproduct gives us a value that is higher when
-// the lightVec is closer to the gradientVec. We then mulitply this by the given kd factor.
+// the lightVec is closer to the gradientVec. We then multiply this by the given kd factor.
                 double diffFactor = VectorMath.dotproduct(gradientVec,lightVector) * kd;
 //                We calculate the spectral factor.
 //                The halfVector is the vector of how the light would leave if it bounced of a surface with a
 // normal=gradientVec.
 //                The dot product corresponds to the similarity between the gradientVec and the halfVec.
 //                To make the effect stronger we then take this value to the nth pow.
-//                Finally we multiply this with the given spectral coeficient.
+//                Finally we multiply this with the given spectral coefficient.
                 double specFactor = Math.pow(VectorMath.dotproduct(gradientVec,halfVector), n) * ks;
 
 //                Add the ambient lighting (we scale the colour with th ambient factor.)
-                colour.r *= ka;
-                colour.g *= ka;
-                colour.b *= ka;
+                shadingColour.r = colour.r * ka;
+                shadingColour.g = colour.g * ka;
+                shadingColour.b = colour.b * ka;
 
 //                If statement to check if we need to apply diffused lighting.
                 if (diffFactor  > 0) {
 //                    Add the diffused lighting
-                    colour.r += colour.r * diffFactor;
-                    colour.g += colour.g * diffFactor;
-                    colour.b += colour.b * diffFactor;
+                    shadingColour.r += colour.r * diffFactor;
+                    shadingColour.g += colour.g * diffFactor;
+                    shadingColour.b += colour.b * diffFactor;
                 }
 //                If statement to check if we need to apply spectral lighting.
                 if (specFactor > 0) {
 //                    Add the spectral lighting (we assume that the specteral lighting is white and therefore we do
 // not multiply the factor with a colour.)
-                    colour.r += specFactor;
-                    colour.g += specFactor;
-                    colour.b += specFactor;
+                    shadingColour.r += specFactor;
+                    shadingColour.g += specFactor;
+                    shadingColour.b += specFactor;
                 }
 
-//                We check if none of the colour channels increased above 1. (This could happen becasue we add the
+//                We check if none of the colour channels increased above 1. (This could happen because we add the
 // three different lightings (ambient, diffused, and spectral))
-                (colour.r>1?1:colour.r;
-                (colour.g>1?1:colour.r;
-                (colour.b>1?1:colour.r;
+                colour.r = (shadingColour.r > 1.0 ? 1.0 : shadingColour.r);
+                colour.g = (shadingColour.g > 1.0 ? 1.0 : shadingColour.g);
+                colour.b = (shadingColour.b > 1.0 ? 1.0 : shadingColour.b);
             }
 
 //            We calculate the rgba value that we would see 'sofar'.
-//            We calculate howmush of the 'light' has already been absorbed by earlier parts of the model: (1-a).
+//            We calculate how much of the 'light' has already been absorbed by earlier parts of the model: (1-a).
 //            We then multiply this with the current color multiplied with the opacity corresponding to this
 // intersection point.
+
+
             r += colour.a * colour.r * (1 - a);
             g += colour.a * colour.g * (1 - a);
             b += colour.a * colour.b * (1 - a);
 
-//            We calculate the amount of light that will have been obsorbed after this intersection point.
+//            We calculate the amount of light that will have been absorbed after this intersection point.
             a += (1 - a) * colour.a;
 
 //            If almost all the 'light' has been absorbed we can quite because (1-a) will be almost 0.
