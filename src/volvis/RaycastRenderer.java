@@ -376,6 +376,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
     private boolean compositingMode = false;
     private boolean tf2dMode = false;
     private boolean shadingMode = false;
+    private boolean perspectiveProjection = false;
 
     //Do NOT modify this function
     int computeImageColor(double r, double g, double b, double a){
@@ -497,6 +498,12 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         shadingMode = mode;
         changed();
     }
+    
+    public void setPerspectiveMode(boolean mode) {
+        perspectiveProjection = mode;
+        changed();
+    }
+    
     //Do NOT modify this function
     public void setMIPMode() {
         setMode(false, true, false, false);
