@@ -105,12 +105,52 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
      * @param entryPoint Point of entering the model.
      * @param exitPoint Point of exiting the model.
      * @param rayVector The vector of the ray.
-     * @param sampleStep The size of the sampel steps.
+     * @param sampleStep The size of the sample steps.
      * @return Returns the color corresponding to the maximum intensity of the intersection points between the ray and
      * the model.
      */
-    int traceRayMIP(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep) {
-//        Calculate the steps that need to be added to the previous intersection point to traverse the ray.
+    int traceRay(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep) {
+        rayVector = rayVector.clone();
+        int[] mirroringFaces = new int[3];
+        if (true) {
+            mirroringFaces[0] = (rayVector[0] > 0 ? volume.getDimX() : 0);
+            mirroringFaces[1] = (rayVector[1] > 0 ? volume.getDimY() : 0);
+            mirroringFaces[2] = (rayVector[2] > 0 ? volume.getDimZ() : 0);
+        } else {
+            mirroringFaces[0] = -1;
+            mirroringFaces[1] = -1;
+            mirroringFaces[2] = -1;
+        }
+
+        TFColor color = new TFColor(0,0,0,0);
+        boolean mirrorX, mirrorY, mirrorZ;
+
+        do {
+            color = mipMirror(entryPoint, exitPoint, rayVector, sampleStep, color);
+            
+            entryPoint = exitPoint.clone();
+            mirrorX = ((int) entryPoint[0]) == mirroringFaces[0] && ((int) rayVector[0]) != 0;
+            mirrorY = ((int) entryPoint[1]) == mirroringFaces[1] && ((int) rayVector[1]) != 0;
+            mirrorZ = ((int) entryPoint[2]) == mirroringFaces[2] && ((int) rayVector[2]) != 0;
+            rayVector[0] *= (mirrorX ? -1 : 1);
+            rayVector[1] *= (mirrorY ? -1 : 1);
+            rayVector[2] *= (mirrorZ ? -1 : 1);
+            
+            double[] originPoint = entryPoint.clone();
+            originPoint[0] -= rayVector[0];
+            originPoint[1] -= rayVector[1];
+            originPoint[2] -= rayVector[2];
+            
+            computeEntryAndExit(originPoint, rayVector, new double[3], exitPoint);
+        } while (color.a < 0.99
+                && (mirrorX || mirrorY ||mirrorZ));
+
+        
+        return computeImageColor(color.r, color.g, color.b, color.a);
+    }
+    
+    TFColor mipMirror(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep, TFColor color) {
+        //        Calculate the steps that need to be added to the previous intersection point to traverse the ray.
         double[] step = new double[3];
         VectorMath.setVector(step, exitPoint[0]-entryPoint[0], exitPoint[1]-entryPoint[1], exitPoint[2]-entryPoint[2]);
 
@@ -123,7 +163,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         }
 
 //        Initialise maxIntensity and set the starting point to the entryPoint.
-        double maxIntensity = Double.MIN_VALUE;
+        double maxIntensity = color.r * volume.getMaximum();
         double[] temp = entryPoint.clone();
 
 //        Iterate over all the intersection points
@@ -147,7 +187,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
 //        Compute the color to display the intensity that was found in this ray.
         double c = maxIntensity / volume.getMaximum();
         double alpha = c > 0 ? 1.0 : 0.0;
-        return computeImageColor(c,c,c,alpha);
+        return new TFColor(c, c, c, alpha);
     }
 
     /**
@@ -160,7 +200,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
      * @return The colour computed by applying compositing or the 2d transfer function and perhaps blinn-phong
      * shading on each of the intersection points.
      */
-    int traceRayComposite(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep) {
+    TFColor traceRayComposite(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep, TFColor priorColor) {
         double[] lightVector = new double[3];
         double[] halfVector = new double[3];
         //the light vector is directed toward the view point (which is the source of the light)
@@ -180,7 +220,10 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         }
 
 //        Initialise variables for iteration.
-        double r = 0, g = 0, b = 0, a = 0;
+        double r = priorColor.r;
+        double g = priorColor.g;
+        double b = priorColor.b;
+        double a = priorColor.a;
         double ka = 0.1, kd = 0.7, ks = 0.2;
         int n = 10;
 
@@ -306,7 +349,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         }
 
 //        We return the calculated colour.
-        return computeImageColor(r,g,b,a);
+        return new TFColor(r,g,b,a);
     }
     
     void raycast(double[] viewMatrix) {
@@ -343,12 +386,13 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
             	// compute the entry and exit point of the ray
                 computeEntryAndExit(pixelCoord, rayVector, entryPoint, exitPoint);
                 if ((entryPoint[0] > -1.0) && (exitPoint[0] > -1.0)) {
-                    int val = 0;
+                    TFColor color = new TFColor();
                     if (compositingMode || tf2dMode) {
-                        val = traceRayComposite(entryPoint, exitPoint, rayVector, sampleStep);
-                    } else if (mipMode) {
-                        val = traceRayMIP(entryPoint, exitPoint, rayVector, sampleStep);
-                    }
+                            color = traceRayComposite(entryPoint, exitPoint, rayVector, sampleStep, new TFColor(0, 0, 0, 0));
+                        } else if (mipMode) {
+                            color = mipMirror(entryPoint, exitPoint, rayVector, sampleStep, new TFColor(0, 0, 0, 0));
+                        }
+                    int val = computeImageColor(color.r, color.g, color.b, color.a);
                     for (int ii = i; ii < i + increment; ii++) {
                         for (int jj = j; jj < j + increment; jj++) {
                             image.setRGB(ii, jj, val);
