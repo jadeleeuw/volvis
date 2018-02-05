@@ -318,28 +318,60 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         double[] pixelCoord = new double[3];
         double[] entryPoint = new double[3];
         double[] exitPoint = new double[3];
+        double[] rayVector = new double[3];
+        double[] cameraCoord = new double[3];
 
         // ray parameters
         int increment = 1;
         double sampleStep = 1.0;
-      
+
         
         // reset the image to black
         resetImage();
         // compute the view plane and the view vector that is used to compute the entry and exit point of the ray the viewVector is pointing towards the camera
         getViewPlaneVectors(viewMatrix,viewVec,uVec,vVec);
-        
-        //The ray is pointing towards the scene
-        double[] rayVector = new double[3];
-        rayVector[0]=-viewVec[0];rayVector[1]=-viewVec[1];rayVector[2]=-viewVec[2];
-        
-        // We use orthographic projection. Viewer is far away at the infinite, all pixels have the same rayVector.
-        
+
+
+//       Execute if perspective mode = true
+        if (perspectiveMode) {
+//        Calculate the central pixelcoord of the screen.
+            double[] centralPixel = new double[3];
+            computePixelCoordinatesBehind(centralPixel, viewVec, uVec, vVec, image.getWidth() / 2, image.getHeight() / 2);
+
+//        Place the camera at 1000 times the viewVec away from the screen. This determines how strong the perspective
+// projection is. If we are closer to the screen the difference between far and close is big however is we are
+// further away the difference gets smaller.
+//        1000 times is the built in position of the camera.
+
+            cameraCoord[0] = centralPixel[0] + viewVec[0] * 1000;
+            cameraCoord[1] = centralPixel[1] + viewVec[1] * 1000;
+            cameraCoord[2] = centralPixel[2] + viewVec[2] * 1000;
+        } else {
+            rayVector[0]=-viewVec[0];rayVector[1]=-viewVec[1];rayVector[2]=-viewVec[2];
+        }
+
         // ray computation for each pixel
         for (int j = 0; j < image.getHeight(); j += increment) {
             for (int i = 0; i < image.getWidth(); i += increment) {
-                // compute starting points of rays in a plane shifted backwards to a position behind the data set
-            	computePixelCoordinatesBehind(pixelCoord,viewVec,uVec,vVec,i,j);
+
+                // Compute starting points of rays in a plane shifted backwards to a position behind the data set
+            	computePixelCoordinatesBehind(pixelCoord,viewVec,uVec,vVec, i, j);
+
+//            	  Execute if perspective mode = true
+            	if (perspectiveMode) {
+//                Calculate the ray directions by calculating the ray that goes towards the pixelCoord from the
+// cameraCoord.
+                    rayVector[0] = pixelCoord[0] - cameraCoord[0];
+                    rayVector[1] = pixelCoord[1] - cameraCoord[1];
+                    rayVector[2] = pixelCoord[2] - cameraCoord[2];
+
+//                Normalise the ray.
+                    double length = VectorMath.length(rayVector);
+                    rayVector[0] /= length;
+                    rayVector[1] /= length;
+                    rayVector[2] /= length;
+                }
+
             	// compute the entry and exit point of the ray
                 computeEntryAndExit(pixelCoord, rayVector, entryPoint, exitPoint);
                 if ((entryPoint[0] > -1.0) && (exitPoint[0] > -1.0)) {
@@ -376,7 +408,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
     private boolean compositingMode = false;
     private boolean tf2dMode = false;
     private boolean shadingMode = false;
-    private boolean perspectiveProjection = false;
+    private boolean perspectiveMode = false;
 
     //Do NOT modify this function
     int computeImageColor(double r, double g, double b, double a){
@@ -498,12 +530,12 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         shadingMode = mode;
         changed();
     }
-    
+
     public void setPerspectiveMode(boolean mode) {
-        perspectiveProjection = mode;
+        perspectiveMode = mode;
         changed();
     }
-    
+
     //Do NOT modify this function
     public void setMIPMode() {
         setMode(false, true, false, false);
