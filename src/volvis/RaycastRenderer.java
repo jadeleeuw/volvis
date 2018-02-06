@@ -150,6 +150,71 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         return computeImageColor(c,c,c,alpha);
     }
 
+//    Executes ray tracing and uses singleTraceRayComposite to do the actual ray tracing. Contains mirroring logic.
+    int traceRayComposite(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep) {
+        TFColor color = new TFColor(0,0,0,0);
+//        Whether to execute the mirroring mode.
+        if (!mirrorMode) {
+//            Normal TraceRayComposite run
+            color  = singleTraceRayComposite(entryPoint, exitPoint, rayVector, sampleStep, color);
+            return computeImageColor(color.r, color.g, color.b, color.a);
+        }
+//        Mirroring code
+        else {
+//            Clone vector incase it is orthographic projection, in which case we could alter the ray for the next
+// pixels.
+            rayVector = rayVector.clone();
+
+//            Calculate which faces should by mirroring.
+            int[] mirroringFaces = new int[3];
+            mirroringFaces[0] = (rayVector[0] > 0 ? volume.getDimX() : 0);
+            mirroringFaces[1] = (rayVector[1] > 0 ? volume.getDimY() : 0);
+            mirroringFaces[2] = (rayVector[2] > 0 ? volume.getDimZ() : 0);
+
+//            Loop in which we use `singleTraceRayComposite` to trace a ray. In the rest of the loop we calculate if
+// the ray should be mirrored and calculate the new ray, entry-, and exitPoint.
+            boolean mirrorX, mirrorY, mirrorZ;
+            do {
+//                Execute teh ray trace.
+                color = singleTraceRayComposite(entryPoint, exitPoint, rayVector, sampleStep, color);
+
+//                Calculate whether the exit point is close enough to a mirroring face to reflect the ray. Not
+// straight forward because the exitPoint is often not accurate/correct.
+                double error = 0.00001;
+                boolean hitX = exitPoint[0] + error >= mirroringFaces[0]
+                        && exitPoint[0] - error <= mirroringFaces[0];
+                boolean hitY = exitPoint[1] + error >= mirroringFaces[1]
+                        && exitPoint[1] - error <= mirroringFaces[1];
+                boolean hitZ = exitPoint[2] + error >= mirroringFaces[2]
+                        && exitPoint[2] - error <= mirroringFaces[2];
+
+//                Calculate whether to reflect. Must be close to the face and not move parallel to the face.
+                mirrorX = hitX && !(Math.abs((int) rayVector[1]) == 1 || Math.abs((int) rayVector[2]) == 1);
+                mirrorY = hitY && !(Math.abs((int) rayVector[0]) == 1 || Math.abs((int) rayVector[2]) == 1);
+                mirrorZ = hitZ && !(Math.abs((int) rayVector[0]) == 1 || Math.abs((int) rayVector[1]) == 1);
+
+//                Reflect ray.
+                rayVector[0] *= (mirrorX ? -1 : 1);
+                rayVector[1] *= (mirrorY ? -1 : 1);
+                rayVector[2] *= (mirrorZ ? -1 : 1);
+
+//                Find a point on the new ra that is behind the old exit point (new entryPoint)
+                double[] originPoint = new double[3];
+                originPoint[0] = exitPoint[0] - rayVector[0] * 100;
+                originPoint[1] = exitPoint[1] - rayVector[1] * 100;
+                originPoint[2] = exitPoint[2] - rayVector[2] * 100;
+
+//                compute new exit- and entryPoint.
+                computeEntryAndExit(originPoint, rayVector, entryPoint, exitPoint);
+
+//                If alpha is almost 1 or ray was not mirrored the while loop will stop.
+            } while (color.a < 0.99 && (mirrorX || mirrorY || mirrorZ));
+
+//            Return the accumulated color.
+            return computeImageColor(color.r, color.g, color.b, color.a);
+        }
+    }
+
     /**
      * Calculates the colour by applying compositing or the 2d transfer function depending on with mode is true. It
      * then applies blinn-phong shading if shading = true
@@ -157,10 +222,12 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
      * @param exitPoint The point where the ray exits the model
      * @param rayVector The vector representing the direction of the ray.
      * @param sampleStep The sample step to calculate the next intersection points.
+     * @param color The color to start off with.
      * @return The colour computed by applying compositing or the 2d transfer function and perhaps blinn-phong
      * shading on each of the intersection points.
      */
-    int traceRayComposite(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep) {
+    TFColor singleTraceRayComposite(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep,
+                                    TFColor color) {
         double[] lightVector = new double[3];
         double[] halfVector = new double[3];
         //the light vector is directed toward the view point (which is the source of the light)
@@ -180,7 +247,10 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         }
 
 //        Initialise variables for iteration.
-        double r = 0, g = 0, b = 0, a = 0;
+        double r = color.r;
+        double g = color.g;
+        double b = color.b;
+        double a = color.a;
         double ka = 0.1, kd = 0.7, ks = 0.2;
         int n = 10;
 
@@ -202,7 +272,8 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
 //            The following code corresponds to compositing.
             if (compositingMode) {
 //                We set the colour of this intersection point to the colour corresponding to the intensity value.
-                colour = tFunc.getColor((int) value);
+                TFColor tfColour = tFunc.getColor((int) value);
+                colour = new TFColor(tfColour.r,tfColour.g,tfColour.b,tfColour.a);
             }
 
 //            The following code corresponds to the transfer function 2d mode.
@@ -306,7 +377,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         }
 
 //        We return the calculated colour.
-        return computeImageColor(r,g,b,a);
+        return new TFColor(r,g,b,a);
     }
     
     void raycast(double[] viewMatrix) {
@@ -409,6 +480,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
     private boolean tf2dMode = false;
     private boolean shadingMode = false;
     private boolean perspectiveMode = false;
+    private boolean mirrorMode = false;
 
     //Do NOT modify this function
     int computeImageColor(double r, double g, double b, double a){
@@ -536,6 +608,10 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         changed();
     }
 
+    public void setMirrorMode(boolean mirrorMode) {
+        this.mirrorMode = mirrorMode;
+        changed();
+    }
     //Do NOT modify this function
     public void setMIPMode() {
         setMode(false, true, false, false);
@@ -593,6 +669,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
 
     }
     //Do NOT modify this function
+
     private void intersectFace(double[] plane_pos, double[] plane_normal,
             double[] line_pos, double[] line_dir, double[] intersection,
             double[] entryPoint, double[] exitPoint) {
@@ -622,11 +699,11 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
             }
         }
     }
- 
-  
-   
-    
+
+
+
     //Do NOT modify this function
+
     void computeEntryAndExit(double[] p, double[] viewVec, double[] entryPoint, double[] exitPoint) {
 
         for (int i = 0; i < 3; i++) {
@@ -663,7 +740,6 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         intersectFace(plane_pos, plane_normal, p, viewVec, intersection, entryPoint, exitPoint);
 
     }
-
     //Do NOT modify this function
     private void drawBoundingBox(GL2 gl) {
         gl.glPushAttrib(GL2.GL_CURRENT_BIT);
@@ -784,9 +860,10 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         }
 
     }
-    private BufferedImage image;
 
+    private BufferedImage image;
     //Do NOT modify this function
+
     @Override
     public void changed() {
         for (int i=0; i < listeners.size(); i++) {
